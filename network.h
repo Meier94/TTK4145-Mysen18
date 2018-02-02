@@ -36,6 +36,11 @@ typedef struct message{
 	int dataLength;
 }message_t;
 
+typedef struct tcp_accept_sock_struct{
+	int sockfd
+	fd_set fdset;
+}tcp_accept_sock;
+
 
 uint32_t 		ip_get();
 char* 			ip_to_string(uint32_t ip);

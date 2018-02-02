@@ -1,5 +1,10 @@
 #include "network.h"
 
+#define BUFLEN 1024
+uint32_t my_ip;
+static connection_t* connectionList = NULL;
+static int numConnections = 0;
+
 //void send_msg_request(int i){
 //	sockfd = connectionList[i].sockfd;
 //	if(sockfd == 0){
@@ -41,13 +46,171 @@
 // }
 //
 
+
 //Hva skal man gjøre i de tilfellene der funksjoner som socket() og bind() returnerer dårlige verdier?
 //burde håndteres ved å måtte prøve på nytt eller liknende.
 
+void cl_addConnection(connection_t newConnection){
+	connection_t* newList = malloc(sizeof(connection_t*(numConnections+1)));
+	for(int i = 0; i < numConnections; i++){
+		newList[i] = connectionList[i];
+	}
+	newList[numConnections] = newConnection;
+	numConnections++;
+	if(connectionList != NULL){
+		free(connectionList);
+	}
+	connectionList = newList;
+}
 
-#define BUFLEN 1024
-uint32_t my_ip;
+void cl_removeConnection(int index){
+	close(connectionList[i].sockfd);
+	connection_t* newList = malloc(sizeof(connection_t*(numConnections-1)));
+	for(int i = 0; i < index; i++){
+		newList[i] = connectionList[i];
+	}
+	for(int i = index; i < numConnections-1; i++){
+		newList[i] = connectionList[i+1];
+	}
+	numConnections--;
+	if(connectionList != NULL){
+		free(connectionList);
+	}
+	connectionList = newList;
+}
 
+void cl_removeAll() {
+	for (int i = 0; i < numConnections; i++) {
+		close(connectionList[i].sockfd);
+	}
+	if (connectionList != NULL) {
+		free(connectionList);
+	}
+	connectionList = NULL;
+}
+
+
+
+int tcp_openConnection(uint32_t ip, int port) {
+	int sockfd;
+	struct sockaddr_in serv_addr;
+
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sockfd < 0) printf("ERROR opening socket");
+
+	memset((char *)&serv_addr, 0, sizeof(serv_addr));
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = ip;
+	serv_addr.sin_port = htons(port);
+
+	res = connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr));
+	if (res < 0) {
+		// error("ERROR connecting");
+		printf("Tried to open connection to %s:%d but failed\n", ip, port);
+		return -1;
+	}
+
+	return sockfd;
+}
+
+void* thr_tcp_accept_connections(void* arg){
+	tcp_accept_sock sock = tcp_create_acceptance_socket();
+
+
+	clilen = sizeof(cli_addr);
+	while(!in.cancel){
+		if(!tcp_get_connection_queue(sock)){
+			//No connection attempts received
+			continue;
+		}
+		//There are incoming connections waiting to be accepted
+		tcp_create_connections_from_queue(sock);
+	}
+	close(sockfd);
+}
+
+int tcp_get_connection_queue(tcp_accept_sock sock){
+	struct timeval timeout = {.tv_sec = 0, .tv_usec = 1e5};
+	if ((rc = select(sock.sockfd + 1, sock.fdset, NULL, NULL, &timeout)) == -1) {
+		error("select failed");
+	}
+	if (rc == 0) {
+		return -1;
+	}
+	return 0;
+}
+
+tcp_accept_sock tcp_create_acceptance_socket(){
+	int sockfd, newsockfd, port, rc, on = 1, off = 0;
+
+	//Create socket
+	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		error("ERROR opening socket");
+	}
+	//Socket descriptor may be reused
+	int optval = 1;
+	if((rc = setsockopt(sockfd,SOL_SOCKET,SO_REUSEADDR, &optval, sizeof(optval)) < 0){
+		close(sockfd);
+		error(" failed");
+	}
+	//Set socket to non blocking
+	if((rc = ioctl(sockfd, FIONBIO, (char *)&on)) < 0){
+		close(sockfd);
+		error("ioctl failed");
+	}
+	//Bind socket
+	bzero((char *) &serv_addr, sizeof(serv_addr));
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = INADDR_ANY;
+	serv_addr.sin_port = htons(TCP_PORT);
+
+	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+		close(sockfd);
+		error("ERROR on binding");
+	}
+
+	//Set listen backlog to 5 entries
+	listen(sockfd,5);
+	//Make socket sole entry in fdset
+	fd_set fdset;
+	FD_ZERO(&fdset);
+	FD_SET(sockfd, &fdset);
+
+	tcp_accetp_sock sock = {.sockfd = sockfd, .fdset = fdset};
+	return sock;
+}
+
+void tcp_create_connections_from_queue(tcp_accept_sock sock){
+	socklen_t clilen;
+	struct sockaddr_in serv_addr, cli_addr;
+
+	//Iterate over all entries in the socket queue of sockfd
+	do {
+		newsockfd = accept(sock.sockfd, (struct sockaddr *) &cli_addr, &clilen);
+		if (newsockfd < 0) {
+			if (errno != WOULDBLOCK) {
+				error("ERROR on accept");
+			}
+			//Should not happen with the select check above, but precautionary
+			break;
+		}
+
+		//Set socket to non blocking
+		//-------------------skal denne endres til å sende inn &on istedenfor?
+		if ((rc = ioctl(newsockfd, FIONBIO, (char *)&off)) < 0) {
+			close(newsockfd);
+			error("ioctl failed");
+		}
+
+		struct timeval tv = {.tv_sec = 2, .tv_usec = 0};
+
+		setsockopt(newsockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
+
+		connection_t newConnection;
+		newConnection.sockfd = newsockfd;
+		cl_addConnection(newConnection);
+	} while (newsockfd != -1);
+}
 
 
 
