@@ -21,8 +21,8 @@ int main(){
 
 	message_t msg;
 	memset(msg.data, 0, 1024);
-	*(uint16_t*)msg.data = 1024;
-	msg.dataLength = 1024;
+	*(uint32_t*)msg.data = ip;
+	msg.dataLength = 4;
 
 	while(1){
 		udp_broadcast(conn, &msg);

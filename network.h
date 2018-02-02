@@ -15,6 +15,8 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 
+#define MSG_IP_BROADCAST 100
+
 #define BROADCAST 0
 #define LISTEN 1
 

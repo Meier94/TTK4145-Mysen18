@@ -114,12 +114,11 @@ int udp_recv_msg(udp_sock conn, message_t* msg){
 	}
 
 	//Vurder å fjerne denne sjekken. Ved testing så ble den aldri utløst med 30% packet loss 10 000*1kB meldinger. Meldinger ble bare ikke plukket opp av recvfrom. 
-	if(*(uint16_t*)msg->data != res){
-		char *ip = inet_ntoa(si_other.sin_addr);
-		printf("Length: %d, %d, %s\n",res,*(uint16_t*)msg->data, ip);
-		return -1;
-	}
-
+//	if(*(uint16_t*)msg->data != res){
+//		char *ip = inet_ntoa(si_other.sin_addr);
+//		printf("Length: %d, %d, %s\n",res,*(uint16_t*)msg->data, ip);
+//		return -1;
+//	}
 
 	return 0;
 }

@@ -21,7 +21,8 @@ int main(){
 	while(1){
 
 		if(!udp_recv_msg(conn, &msg)){
-			count++;
+			printf("%s\n", ip_to_string(*(uint32_t*)msg.data));
+			return 0;
 		}
 	}
 }
