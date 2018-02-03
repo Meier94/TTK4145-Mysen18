@@ -128,9 +128,14 @@ void* thr_tcp_communication_cycle(void* arg){
 		for(int i = 0; i < numConnections;i++){
 			int sockfd = connectionList[i].sockfd;
 			send_msg_request(sockfd);
-			printf("l\n");
 			//Waiting for response from slave
 			int ret = receive_tcp(sockfd, &msg);
+			if(ret > 0){
+				printf("%s\n", msg.data);
+			}
+			else{
+				printf("No response\n");
+			}
 		}
 	}
 	return NULL;
@@ -148,7 +153,7 @@ void* thr_tcp_listen(void* arg){
 		if (ret <= 0){
 			continue;
 		}
-
+		/*
 		//reply
 		if (ret == 1 && message.data[0] == MSGID_REQUEST){
 			message.dataLength = sprintf(message.data, "Eboi\n") + 1;
@@ -157,7 +162,7 @@ void* thr_tcp_listen(void* arg){
 				printf("Writing to socket %d, failed, got %d\n", sockfd, res);
 			}
 		}
-
+		*/
 	}
 }
 
