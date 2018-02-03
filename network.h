@@ -37,7 +37,7 @@ typedef struct udp_sock_struct{
 
 typedef struct message{
 	char data[1024];
-	int dataLength;
+	int length;
 }message_t;
 
 typedef struct tcp_accept_sock_struct{

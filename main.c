@@ -24,7 +24,7 @@ int main(){
 	message_t msg;
 	memset(msg.data, 0, 1024);
 	*(ipv4*)msg.data = ip;
-	msg.dataLength = 4;
+	msg.length = 4;
 
 
 	pthread_t tcp_accept;

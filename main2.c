@@ -20,7 +20,7 @@ int main(){
 	udp_sock conn = udp_open_socket(LISTEN);
 	while(1){
 
-		if(!udp_recv_msg(conn, &msg)){
+		if(udp_recv_msg(conn, &msg)){
 			ip.addr = *(uint32_t*)msg.data;
 			printf("%s\n", ip_to_string(ip));
 			break;

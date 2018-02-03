@@ -9,10 +9,10 @@ static ipv4 my_ip;
 static connection_t connectionList[MAX_NODES];
 static int numConnections = 0;
 
-tcp_accept_sock tcp_create_acceptance_socket();
+int tcp_create_acceptance_socket();
 int tcp_openConnection(ipv4 ip, int port);
-int tcp_get_connection_queue(tcp_accept_sock sock);
-void tcp_create_connections_from_queue(tcp_accept_sock sock);
+int tcp_get_connection_queue(int sockfd);
+void tcp_create_connections_from_queue(int sockfd);
 
 void error(char *s){
 	perror(s);
@@ -20,35 +20,83 @@ void error(char *s){
 }
 
 void send_msg_request(int sockfd){
-	int rc;
-
 	message_t message;
 	message.data[0] = MSGID_REQUEST;
-	message.dataLength = 1;
-	if ((rc = write(sockfd, message.data, message.dataLength)) < 0) {
+	message.length = 1;
+	if (write(sockfd, message.data, message.length) < 0) {
 		error("Couldnt write to master 1\n");
 	}
 }
 
+void tcp_send(int sockfd, message_t* msg){
+	if(write(sockfd, msg->data, msg->length) < 0){
+		error("Could not write tcp message");
+	}
+}
 
-//Burde kanskje se litt på return verdier
-int receive_tcp(int sockfd, message_t* msg){
 
-	msg->dataLength = 1024;
+//Er det nødvendig å gjøre tre forsøk? Gir mening for sender i guess, men i dette 
+//tilfellet ville en timout tid på 6 sek og ett forsøk gi samme oppførsel. 
+//Gir mening med forsøk dersom det skal være mulig å avbryte fra utsiden.
+//Kan være lettere med MSG_DONTWAIT og fikse forsøk utenfra. Meldinger skal lagres i socketen så vidt jeg vet
+//TESTET -> venter i 3x timout (2 sek as of writing this) om den ikke mottar melding
+//Klarer å motta melding fra connected tcp node dersom det blir sendt noen
+int receive_tcp(int sockfd, message_t* msg, uint32_t timeout){
 	int n;
 
-	int attempts = 1;
-	while(attempts <= 3){
-		n = recv(sockfd, msg->data, msg->dataLength, 0);
-		if (n <= 0) {
+	unsigned int attempts = 1;
+	while(attempts <= timeout*10){
+		n = recv(sockfd, msg->data, BUFLEN, 0);
+		if(n < 0){
+			if (errno != EWOULDBLOCK && errno != EAGAIN) {
+				error("Error receiving tcp message");
+			}
 			attempts++;
 			continue;
 		}
-    	break;
+		//Received message
+		msg->length = n;
+		return n;
     }
-    msg->dataLength = n;
+    //Timed out
     return n;
  }
+
+//Vet ikke helt hva tanken var med dette :/
+//int receive_tcp_timeout(int sockfd, message_t* msg, int timeout){
+//	timeout*=1000;
+//	int n;
+//
+//	fd_set fdset;
+//	FD_ZERO(&fdset);
+//	FD_SET(sockfd, &fdset);
+//	struct timeval trytime = {.tv_sec = 0, .tv_usec = 1e5};
+//
+//	uint32_t time = 0;
+//	while(time < timeout){
+//		int ret = select(sockfd + 1, &fdset, NULL, NULL, &trytime);
+//		if (ret < 0) {
+//			error("Select on tcp receive failed");
+//		}
+//		if (!ret){
+//			//timeout
+//			time+=1e5;
+//			continue;
+//		}
+//		n = recv(sockfd, msg->data, BUFLEN, MSG_DONTWAIT);
+//		if(n < 0){
+//			if (errno != EWOULDBLOCK && errno != EAGAIN) {
+//				error("Error receiving tcp message");
+//			}
+//			error("recv blocked after select");
+//		}
+//		//Received message
+//		msg->length = n;
+//		return n;
+//    }
+//    //Timed out
+//    return n;
+// }
 
 
 
@@ -105,20 +153,6 @@ int tcp_openConnection(ipv4 ip, int port) {
 	return sockfd;
 }
 
-void* thr_tcp_accept_connections(void* arg){
-	tcp_accept_sock sock = tcp_create_acceptance_socket();
-
-	while(true){
-		if(tcp_get_connection_queue(sock)){
-			//No connection attempts received
-			continue;
-		}
-		printf("Received attempt(s) to connect\n");
-		//There are incoming connections waiting to be accepted
-		tcp_create_connections_from_queue(sock);
-	}
-	close(sock.sockfd);
-}
 
 
 void* thr_tcp_communication_cycle(void* arg){
@@ -129,12 +163,14 @@ void* thr_tcp_communication_cycle(void* arg){
 			int sockfd = connectionList[i].sockfd;
 			send_msg_request(sockfd);
 			//Waiting for response from slave
-			int ret = receive_tcp(sockfd, &msg);
+			int ret = receive_tcp(sockfd, &msg, 2);
 			if(ret > 0){
 				printf("%s\n", msg.data);
 			}
-			else{
-				printf("No response\n");
+			else {
+				//Ingen melding mottatt til timeouten gitt ut
+				printf("Disconnected\n");
+				cl_removeConnection(i);
 			}
 		}
 	}
@@ -142,43 +178,63 @@ void* thr_tcp_communication_cycle(void* arg){
 }
 
 void* thr_tcp_listen(void* arg){
-	message_t message;
-	message.dataLength = 1024;
+	message_t msg;
 	int sockfd = (int)arg;
 	printf("socket: %d\n", sockfd);
 
 	while (true){
 		//Waiting for message from master
-		int ret = receive_tcp(sockfd, &message);
+		int ret = receive_tcp(sockfd, &msg, 2);
 		if (ret <= 0){
 			continue;
 		}
-		/*
-		//reply
-		if (ret == 1 && message.data[0] == MSGID_REQUEST){
-			message.dataLength = sprintf(message.data, "Eboi\n") + 1;
-			int res = write(sockfd, message.data, message.dataLength);
-			if (res != message.dataLength){
-				printf("Writing to socket %d, failed, got %d\n", sockfd, res);
-			}
-		}
-		*/
+		msg.length = sprintf(msg.data, "Test message 1");
+		tcp_send(sockfd, &msg);
+
 	}
 }
 
-int tcp_get_connection_queue(tcp_accept_sock sock){
+
+
+void* thr_tcp_accept_connections(void* arg){
+	int sockfd = tcp_create_acceptance_socket();
+
+	while(true){
+		//Probe new connections for 100ms
+		if(!tcp_get_connection_queue(sockfd)){
+			//No connection attempts received
+			continue;
+		}
+		printf("Received attempt(s) to connect\n");
+		//There are incoming connections waiting to be accepted
+		tcp_create_connections_from_queue(sockfd);
+	}
+	close(sockfd);
+}
+
+
+
+int tcp_get_connection_queue(int sockfd){
 	int rc;
+
+	//Make socket sole entry in fdset
+	fd_set fdset;
+	FD_ZERO(&fdset);
+	FD_SET(sockfd, &fdset);
+
 	struct timeval timeout = {.tv_sec = 0, .tv_usec = 1e5};
-	if ((rc = select(sock.sockfd + 1, &sock.fdset, NULL, NULL, &timeout)) == -1) {
+	if ((rc = select(sockfd + 1, &fdset, NULL, NULL, &timeout)) < 0) {
 		error("select failed");
 	}
 	if (rc == 0) {
-		return -1;
+		//Timeout
+		return 0;
 	}
-	return 0;
+	//TCP client discovered
+	return 1;
 }
 
-tcp_accept_sock tcp_create_acceptance_socket(){
+int tcp_create_acceptance_socket(){
 	int sockfd, rc, on = 1;
 	struct sockaddr_in serv_addr;
 
@@ -210,46 +266,33 @@ tcp_accept_sock tcp_create_acceptance_socket(){
 
 	//Set listen backlog to 5 entries
 	listen(sockfd,5);
-	//Make socket sole entry in fdset
-	fd_set fdset;
-	FD_ZERO(&fdset);
-	FD_SET(sockfd, &fdset);
 
-	tcp_accept_sock sock = {.sockfd = sockfd, .fdset = fdset};
-	return sock;
+	return sockfd;
 }
 
-void tcp_create_connections_from_queue(tcp_accept_sock sock){
+void tcp_create_connections_from_queue(int sockfd){
 	struct sockaddr_in cli_addr;
 	socklen_t clilen = sizeof(cli_addr);
-	int newsockfd, rc, on = 0;
+	int newsockfd;
 
 	//Iterate over all entries in the socket queue of sockfd
 	do {
-		newsockfd = accept(sock.sockfd, (struct sockaddr *) &cli_addr, &clilen);
+		newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
 		if (newsockfd < 0) {
-			if (errno != EWOULDBLOCK) {
-				printf("%s\n",strerror(errno));
+			if (errno != EWOULDBLOCK && errno != EAGAIN) {
+				error("Could not accept tcp request");
 			}
-			//Should not happen with the select check above, but precautionary
 			break;
 		}
 
-		//Set socket to non blocking
-		//-------------------skal denne endres til å sende inn &on istedenfor?
-		if ((rc = ioctl(newsockfd, FIONBIO, (char *)&on)) < 0) {
-			close(newsockfd);
-			error("ioctl failed");
-		}
-
-		struct timeval tv = {.tv_sec = 2, .tv_usec = 0};
-
+		struct timeval tv = {.tv_sec = 0, .tv_usec = 1e5};
 		setsockopt(newsockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
-
+		
 		connection_t newConnection;
 		newConnection.sockfd = newsockfd;
 		cl_addConnection(newConnection);
 	} while (newsockfd != -1);
+
 }
 
 
@@ -302,33 +345,26 @@ int udp_recv_msg(udp_sock conn, message_t* msg){
 	int res = recvfrom(conn.sockfd, msg->data, BUFLEN, 0, (struct sockaddr *) &si_other, &slen);
 	if (res == -1) {
 		if (errno != EWOULDBLOCK || errno != EAGAIN) {
-			printf("Error receiving udp message %s,\n", strerror(errno));
+			error("Error receiving udp message");
 		}
-		return -1;
+		return 0;
 	}
-	msg->dataLength = res;
+	msg->length = res;
 
 	//Check if message came from this machine
 	if(si_other.sin_addr.s_addr == my_ip.addr){
-		return -1;
+		return 0;
 	}
 
-	//Vurder å fjerne denne sjekken. Ved testing så ble den aldri utløst med 30% packet loss 10 000*1kB meldinger. Meldinger ble bare ikke plukket opp av recvfrom. 
-//	if(*(uint16_t*)msg->data != res){
-//		char *ip = inet_ntoa(si_other.sin_addr);
-//		printf("Length: %d, %d, %s\n",res,*(uint16_t*)msg->data, ip);
-//		return -1;
-//	}
-
-	return 0;
+	return res;
 }
 
 
 
 
 void udp_broadcast(udp_sock conn, message_t* msg){
-	int res = sendto(conn.sockfd, msg->data, msg->dataLength, 0, (struct sockaddr *) &conn.si_other, sizeof(struct sockaddr));
-	if (res == -1)  printf("udp_broadcast: sendto()\n");
+	int res = sendto(conn.sockfd, msg->data, msg->length, 0, (struct sockaddr *) &conn.si_other, sizeof(struct sockaddr));
+	if (res == -1)  error("Could not broadcast udp message");
 }
 
 
