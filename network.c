@@ -19,6 +19,8 @@ void error(char *s){
 	exit(1);
 }
 
+
+//denne burde ikke finnes btw
 void send_msg_request(int sockfd){
 	message_t message;
 	message.data[0] = MSGID_REQUEST;
@@ -28,6 +30,9 @@ void send_msg_request(int sockfd){
 	}
 }
 
+
+//TESTET
+// -> virker robust
 void tcp_send(int sockfd, message_t* msg){
 	if(write(sockfd, msg->data, msg->length) < 0){
 		error("Could not write tcp message");
@@ -35,12 +40,11 @@ void tcp_send(int sockfd, message_t* msg){
 }
 
 
-//Er det nødvendig å gjøre tre forsøk? Gir mening for sender i guess, men i dette 
-//tilfellet ville en timout tid på 6 sek og ett forsøk gi samme oppførsel. 
-//Gir mening med forsøk dersom det skal være mulig å avbryte fra utsiden.
-//Kan være lettere med MSG_DONTWAIT og fikse forsøk utenfra. Meldinger skal lagres i socketen så vidt jeg vet
-//TESTET -> venter i 3x timout (2 sek as of writing this) om den ikke mottar melding
-//Klarer å motta melding fra connected tcp node dersom det blir sendt noen
+
+//TESTET
+// -> venter til timeout om den ikke får noen melding og ret 0
+// -> dersom avsenderen avslutter fra sin side får man som regel ECONNRESET og den ret 0 med en gang(tatt høyde for)
+// -> virker robust
 int receive_tcp(int sockfd, message_t* msg, uint32_t timeout){
 	int n;
 
@@ -49,6 +53,12 @@ int receive_tcp(int sockfd, message_t* msg, uint32_t timeout){
 		n = recv(sockfd, msg->data, BUFLEN, 0);
 		if(n < 0){
 			if (errno != EWOULDBLOCK && errno != EAGAIN) {
+				if(errno == ECONNRESET){
+					//Disconnected
+					printf("ECONNRESET\n");
+					return 0;
+				}
+				//Shit hit the fan
 				error("Error receiving tcp message");
 			}
 			attempts++;
@@ -62,49 +72,13 @@ int receive_tcp(int sockfd, message_t* msg, uint32_t timeout){
     return n;
  }
 
-//Vet ikke helt hva tanken var med dette :/
-//int receive_tcp_timeout(int sockfd, message_t* msg, int timeout){
-//	timeout*=1000;
-//	int n;
-//
-//	fd_set fdset;
-//	FD_ZERO(&fdset);
-//	FD_SET(sockfd, &fdset);
-//	struct timeval trytime = {.tv_sec = 0, .tv_usec = 1e5};
-//
-//	uint32_t time = 0;
-//	while(time < timeout){
-//		int ret = select(sockfd + 1, &fdset, NULL, NULL, &trytime);
-//		if (ret < 0) {
-//			error("Select on tcp receive failed");
-//		}
-//		if (!ret){
-//			//timeout
-//			time+=1e5;
-//			continue;
-//		}
-//		n = recv(sockfd, msg->data, BUFLEN, MSG_DONTWAIT);
-//		if(n < 0){
-//			if (errno != EWOULDBLOCK && errno != EAGAIN) {
-//				error("Error receiving tcp message");
-//			}
-//			error("recv blocked after select");
-//		}
-//		//Received message
-//		msg->length = n;
-//		return n;
-//    }
-//    //Timed out
-//    return n;
-// }
-
 
 
 //Hva skal man gjøre i de tilfellene der funksjoner som socket() og bind() returnerer dårlige verdier?
 //burde håndteres ved å måtte prøve på nytt eller liknende.
 
 
-
+//Undersøk hva som skjer i communication cycle når vi gikk over til statisk array som ikke er double buffret
 void cl_addConnection(connection_t newConnection){
 	connectionList[numConnections] = newConnection;
 	numConnections++;
