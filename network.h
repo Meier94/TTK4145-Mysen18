@@ -59,6 +59,7 @@ udp_sock 		udp_open_socket(int type);
 void 			udp_close_socket(udp_sock conn);
 void 			udp_broadcast(udp_sock conn, message_t* msg);
 int 			udp_recv_msg(udp_sock conn, message_t* msg);
+int 			tcp_openConnection(ipv4 ip, int port);
 
 void* 			thr_tcp_accept_connections(void* arg);
 void* 			thr_tcp_listen(void* arg);

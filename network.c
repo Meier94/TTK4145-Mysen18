@@ -26,7 +26,7 @@ void send_msg_request(int i){
 	message.data[0] = MSGID_REQUEST;
 	message.dataLength = 1;
 	if ((rc = write(sockfd, message.data, message.dataLength)) < 0) {
-		error("Couldnt write to master 1");
+		error("Couldnt write to master 1\n");
 	}
 }
 
@@ -39,15 +39,12 @@ int receive_tcp(int sockfd, message_t* msg){
 
 	int attempts = 1;
 	while(attempts <= 3){
-		n = recv(sockfd, msg->data, msg->dataLength, MSG_DONTWAIT);
+		n = recv(sockfd, msg->data, msg->dataLength, 0);
 		if (n <= 0) {
 			attempts++;
 			continue;
 		}
     	break;
-    }
-    if(n <= 0){
-    	printf("3x timeout\n");
     }
     msg->dataLength = n;
     return n;
@@ -134,9 +131,6 @@ void* thr_tcp_communication_cycle(void* arg){
 
 			//Waiting for response from slave
 			int ret = receive_tcp(sockfd, &msg);
-			if(ret > 0){
-				printf("message received: %s\n", msg.data);
-			}
 		}
 	}
 	return NULL;
@@ -222,7 +216,7 @@ tcp_accept_sock tcp_create_acceptance_socket(){
 void tcp_create_connections_from_queue(tcp_accept_sock sock){
 	struct sockaddr_in cli_addr;
 	socklen_t clilen = sizeof(cli_addr);
-	int newsockfd, rc, on = 1;
+	int newsockfd, rc, on = 0;
 
 	//Iterate over all entries in the socket queue of sockfd
 	do {
