@@ -140,6 +140,7 @@ void* thr_tcp_listen(void* arg){
 	message_t message;
 	message.dataLength = 1024;
 	int sockfd = *((int*)arg);
+	printf("socket: %d\n", sockfd);
 
 	while (true){
 		//Waiting for message from master
