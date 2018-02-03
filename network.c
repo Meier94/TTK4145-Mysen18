@@ -19,8 +19,8 @@ void error(char *s){
 	exit(1);
 }
 
-void send_msg_request(int i){
-	int rc, sockfd = connectionList[i].sockfd;
+void send_msg_request(int sockfd){
+	int rc;
 
 	message_t message;
 	message.data[0] = MSGID_REQUEST;
@@ -128,7 +128,7 @@ void* thr_tcp_communication_cycle(void* arg){
 		for(int i = 0; i < numConnections;i++){
 			int sockfd = connectionList[i].sockfd;
 			send_msg_request(sockfd);
-
+			printf("l\n");
 			//Waiting for response from slave
 			int ret = receive_tcp(sockfd, &msg);
 		}
