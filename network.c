@@ -19,46 +19,40 @@ void error(char *s){
 	exit(1);
 }
 
-//void send_msg_request(int i){
-//	sockfd = connectionList[i].sockfd;
-//	if(sockfd == 0){
-//		printf("Tried to write to nonexistant socket\n");
-//	}
-//
-//	message_t message;
-//	message.data[0] = MSGID_REQUEST;
-//	message.dataLength = 1;
-//	if ((rc = write(socket, message.data, message.dataLength)) < 0) {
-//		error("Couldnt write to master 1");
-//	}
-//	if(rc != dataLength){
-//		error("Writing returned wrong length\n");
-//	}
-//}
-//
-//void receive_tcp(int i){
-//	//trenger vel ikke den øverste sjekken? Hvordan er det mulig å 
-//	sockfd = connectionList[i].sockfd;
-//	if(sockfd == 0){
-//		printf("Tried to write to nonexistant socket\n");
-//	}
-//
-//	message_t message;
-//	message.data[0] = MSGID_REQUEST;
-//	message.dataLength = 1024;
-//	int n;
-//
-//	int attempts = 1;
-//	while(attempts <= 3){
-//		n = recv(sockfd, message.data, message.dataLength, NULL);
-//		if (n <= 0) {
-//			attempts++;
-//			continue;
-//		}
-//    	break;
-//    }
-// }
-//
+void send_msg_request(int i){
+	int rc, sockfd = connectionList[i].sockfd;
+
+	message_t message;
+	message.data[0] = MSGID_REQUEST;
+	message.dataLength = 1;
+	if ((rc = write(sockfd, message.data, message.dataLength)) < 0) {
+		error("Couldnt write to master 1");
+	}
+}
+
+
+//Burde kanskje se litt på return verdier
+int receive_tcp(int sockfd, message_t* msg){
+
+	msg->dataLength = 1024;
+	int n;
+
+	int attempts = 1;
+	while(attempts <= 3){
+		n = recv(sockfd, msg->data, msg->dataLength, MSG_DONTWAIT);
+		if (n <= 0) {
+			attempts++;
+			continue;
+		}
+    	break;
+    }
+    if(n <= 0){
+    	printf("3x timeout\n");
+    }
+    msg->dataLength = n;
+    return n;
+ }
+
 
 
 //Hva skal man gjøre i de tilfellene der funksjoner som socket() og bind() returnerer dårlige verdier?
@@ -129,6 +123,49 @@ void* thr_tcp_accept_connections(void* arg){
 	close(sock.sockfd);
 }
 
+
+void* thr_tcp_communication_cycle(void* arg){
+	message_t msg;
+
+	while(1){
+		for(int i = 0; i < numConnections;i++){
+			int sockfd = connectionList[i].sockfd;
+			send_msg_request(sockfd);
+
+			//Waiting for response from slave
+			int ret = receive_tcp(sockfd, &msg);
+			if(ret > 0){
+				printf("message received: %s\n", msg.data);
+			}
+		}
+	}
+	return NULL;
+}
+
+void* thr_tcp_listen(void* arg){
+	message_t message;
+	message.dataLength = 1024;
+	int sockfd = *((int*)arg);
+
+	while (true){
+		//Waiting for message from master
+		int ret = receive_tcp(sockfd, &message);
+		if (ret <= 0){
+			continue;
+		}
+
+		//reply
+		if (ret == 1 && message.data[0] == MSGID_REQUEST){
+			message.dataLength = sprintf(message.data, "Eboi\n") + 1;
+			int res = write(sockfd, message.data, message.dataLength);
+			if (res != message.dataLength){
+				printf("Writing to socket %d, failed, got %d\n", sockfd, res);
+			}
+		}
+
+	}
+}
+
 int tcp_get_connection_queue(tcp_accept_sock sock){
 	int rc;
 	struct timeval timeout = {.tv_sec = 0, .tv_usec = 1e5};
@@ -183,8 +220,8 @@ tcp_accept_sock tcp_create_acceptance_socket(){
 }
 
 void tcp_create_connections_from_queue(tcp_accept_sock sock){
-	socklen_t clilen;
 	struct sockaddr_in cli_addr;
+	socklen_t clilen = sizeof(cli_addr);
 	int newsockfd, rc, on = 1;
 
 	//Iterate over all entries in the socket queue of sockfd
@@ -192,7 +229,7 @@ void tcp_create_connections_from_queue(tcp_accept_sock sock){
 		newsockfd = accept(sock.sockfd, (struct sockaddr *) &cli_addr, &clilen);
 		if (newsockfd < 0) {
 			if (errno != EWOULDBLOCK) {
-				error("ERROR on accept");
+				printf("%s\n",strerror(errno));
 			}
 			//Should not happen with the select check above, but precautionary
 			break;

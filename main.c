@@ -28,7 +28,10 @@ int main(){
 
 
 	pthread_t tcp_accept;
+	pthread_t tcp_communicate;
 	pthread_create(&tcp_accept, NULL, thr_tcp_accept_connections, NULL);
+	pthread_create(&tcp_communicate, NULL, thr_tcp_communication_cycle, NULL);
+
 
 
 	while(1){

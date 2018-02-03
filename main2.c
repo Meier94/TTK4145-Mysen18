@@ -27,6 +27,8 @@ int main(){
 		}
 	}
 	int sockfd = tcp_openConnection(ip,TCP_PORT);
+	pthread_t tcp_listen;
+	pthread_create(&tcp_listen, NULL, thr_tcp_listen, (void*)sockfd);
 	while(1){
 		printf("loop\n");
 		sleep(5);

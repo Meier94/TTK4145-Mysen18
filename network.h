@@ -18,7 +18,8 @@
 
 #define MAX_NODES 3
 
-#define MSG_IP_BROADCAST 100
+#define MSGID_IP 100
+#define MSGID_REQUEST 101
 
 #define BROADCAST 0
 #define LISTEN 1
@@ -59,7 +60,9 @@ void 			udp_close_socket(udp_sock conn);
 void 			udp_broadcast(udp_sock conn, message_t* msg);
 int 			udp_recv_msg(udp_sock conn, message_t* msg);
 
-void* thr_tcp_accept_connections(void* arg);
+void* 			thr_tcp_accept_connections(void* arg);
+void* 			thr_tcp_listen(void* arg);
+void* 			thr_tcp_communication_cycle(void* arg);
 
 
 
