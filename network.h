@@ -14,6 +14,9 @@
 #include <errno.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
+#include <pthread.h>
+
+#define MAX_NODES 3
 
 #define MSG_IP_BROADCAST 100
 
@@ -37,19 +40,26 @@ typedef struct message{
 }message_t;
 
 typedef struct tcp_accept_sock_struct{
-	int sockfd
+	int sockfd;
 	fd_set fdset;
 }tcp_accept_sock;
 
+typedef union ipv4{
+	uint32_t addr;
+	unsigned char comp[4];
+}ipv4;
 
-uint32_t 		ip_get();
-char* 			ip_to_string(uint32_t ip);
+
+ipv4			ip_get();
+char* 			ip_to_string(ipv4 ip);
 void 			network_init();
 
 udp_sock 		udp_open_socket(int type);
 void 			udp_close_socket(udp_sock conn);
 void 			udp_broadcast(udp_sock conn, message_t* msg);
 int 			udp_recv_msg(udp_sock conn, message_t* msg);
+
+void* thr_tcp_accept_connections(void* arg);
 
 
 

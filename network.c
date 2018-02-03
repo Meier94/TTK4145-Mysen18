@@ -1,9 +1,23 @@
 #include "network.h"
 
+typedef struct connection{
+	int sockfd;	
+}connection_t;
+
 #define BUFLEN 1024
-uint32_t my_ip;
-static connection_t* connectionList = NULL;
+static ipv4 my_ip;
+static connection_t connectionList[MAX_NODES];
 static int numConnections = 0;
+
+tcp_accept_sock tcp_create_acceptance_socket();
+int tcp_openConnection(ipv4 ip, int port);
+int tcp_get_connection_queue(tcp_accept_sock sock);
+void tcp_create_connections_from_queue(tcp_accept_sock sock);
+
+void error(char *s){
+	perror(s);
+	exit(1);
+}
 
 //void send_msg_request(int i){
 //	sockfd = connectionList[i].sockfd;
@@ -50,48 +64,35 @@ static int numConnections = 0;
 //Hva skal man gjøre i de tilfellene der funksjoner som socket() og bind() returnerer dårlige verdier?
 //burde håndteres ved å måtte prøve på nytt eller liknende.
 
+
+
 void cl_addConnection(connection_t newConnection){
-	connection_t* newList = malloc(sizeof(connection_t*(numConnections+1)));
-	for(int i = 0; i < numConnections; i++){
-		newList[i] = connectionList[i];
-	}
-	newList[numConnections] = newConnection;
+	connectionList[numConnections] = newConnection;
 	numConnections++;
-	if(connectionList != NULL){
-		free(connectionList);
-	}
-	connectionList = newList;
 }
 
 void cl_removeConnection(int index){
-	close(connectionList[i].sockfd);
-	connection_t* newList = malloc(sizeof(connection_t*(numConnections-1)));
-	for(int i = 0; i < index; i++){
-		newList[i] = connectionList[i];
+	if(index >= numConnections){
+		return;
 	}
+	close(connectionList[index].sockfd);
+
 	for(int i = index; i < numConnections-1; i++){
-		newList[i] = connectionList[i+1];
+		connectionList[i] = connectionList[i+1];
 	}
 	numConnections--;
-	if(connectionList != NULL){
-		free(connectionList);
-	}
-	connectionList = newList;
 }
 
 void cl_removeAll() {
 	for (int i = 0; i < numConnections; i++) {
 		close(connectionList[i].sockfd);
 	}
-	if (connectionList != NULL) {
-		free(connectionList);
-	}
-	connectionList = NULL;
+	numConnections = 0;
 }
 
 
 
-int tcp_openConnection(uint32_t ip, int port) {
+int tcp_openConnection(ipv4 ip, int port) {
 	int sockfd;
 	struct sockaddr_in serv_addr;
 
@@ -100,13 +101,13 @@ int tcp_openConnection(uint32_t ip, int port) {
 
 	memset((char *)&serv_addr, 0, sizeof(serv_addr));
 	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = ip;
+	serv_addr.sin_addr.s_addr = ip.addr;
 	serv_addr.sin_port = htons(port);
 
-	res = connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr));
+	int res = connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr));
 	if (res < 0) {
 		// error("ERROR connecting");
-		printf("Tried to open connection to %s:%d but failed\n", ip, port);
+		printf("Tried to open connection to %s:%d but failed\n", ip_to_string(ip), port);
 		return -1;
 	}
 
@@ -116,22 +117,22 @@ int tcp_openConnection(uint32_t ip, int port) {
 void* thr_tcp_accept_connections(void* arg){
 	tcp_accept_sock sock = tcp_create_acceptance_socket();
 
-
-	clilen = sizeof(cli_addr);
-	while(!in.cancel){
-		if(!tcp_get_connection_queue(sock)){
+	while(true){
+		if(tcp_get_connection_queue(sock)){
 			//No connection attempts received
 			continue;
 		}
+		printf("Received attempt(s) to connect\n");
 		//There are incoming connections waiting to be accepted
 		tcp_create_connections_from_queue(sock);
 	}
-	close(sockfd);
+	close(sock.sockfd);
 }
 
 int tcp_get_connection_queue(tcp_accept_sock sock){
+	int rc;
 	struct timeval timeout = {.tv_sec = 0, .tv_usec = 1e5};
-	if ((rc = select(sock.sockfd + 1, sock.fdset, NULL, NULL, &timeout)) == -1) {
+	if ((rc = select(sock.sockfd + 1, &sock.fdset, NULL, NULL, &timeout)) == -1) {
 		error("select failed");
 	}
 	if (rc == 0) {
@@ -141,7 +142,8 @@ int tcp_get_connection_queue(tcp_accept_sock sock){
 }
 
 tcp_accept_sock tcp_create_acceptance_socket(){
-	int sockfd, newsockfd, port, rc, on = 1, off = 0;
+	int sockfd, rc, on = 1;
+	struct sockaddr_in serv_addr;
 
 	//Create socket
 	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -149,7 +151,7 @@ tcp_accept_sock tcp_create_acceptance_socket(){
 	}
 	//Socket descriptor may be reused
 	int optval = 1;
-	if((rc = setsockopt(sockfd,SOL_SOCKET,SO_REUSEADDR, &optval, sizeof(optval)) < 0){
+	if((rc = setsockopt(sockfd,SOL_SOCKET,SO_REUSEADDR, &optval, sizeof(optval)) < 0)){
 		close(sockfd);
 		error(" failed");
 	}
@@ -176,19 +178,20 @@ tcp_accept_sock tcp_create_acceptance_socket(){
 	FD_ZERO(&fdset);
 	FD_SET(sockfd, &fdset);
 
-	tcp_accetp_sock sock = {.sockfd = sockfd, .fdset = fdset};
+	tcp_accept_sock sock = {.sockfd = sockfd, .fdset = fdset};
 	return sock;
 }
 
 void tcp_create_connections_from_queue(tcp_accept_sock sock){
 	socklen_t clilen;
-	struct sockaddr_in serv_addr, cli_addr;
+	struct sockaddr_in cli_addr;
+	int newsockfd, rc, on = 1;
 
 	//Iterate over all entries in the socket queue of sockfd
 	do {
 		newsockfd = accept(sock.sockfd, (struct sockaddr *) &cli_addr, &clilen);
 		if (newsockfd < 0) {
-			if (errno != WOULDBLOCK) {
+			if (errno != EWOULDBLOCK) {
 				error("ERROR on accept");
 			}
 			//Should not happen with the select check above, but precautionary
@@ -197,7 +200,7 @@ void tcp_create_connections_from_queue(tcp_accept_sock sock){
 
 		//Set socket to non blocking
 		//-------------------skal denne endres til å sende inn &on istedenfor?
-		if ((rc = ioctl(newsockfd, FIONBIO, (char *)&off)) < 0) {
+		if ((rc = ioctl(newsockfd, FIONBIO, (char *)&on)) < 0) {
 			close(newsockfd);
 			error("ioctl failed");
 		}
@@ -236,10 +239,9 @@ udp_sock udp_open_socket(int type) {
 		si_me.sin_addr.s_addr = htonl(INADDR_ANY);
 		struct timeval tv = {.tv_sec = 0, .tv_usec = 1e5};
 		setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
+		int res = bind(sockfd, (struct sockaddr *) &si_me, sizeof(si_me));
+		if (res == -1) printf("thr_udpListen:bind\n");
 	}
-
-	int res = bind(sockfd, (struct sockaddr *) &si_me, sizeof(si_me));
-	if (res == -1) printf("thr_udpListen:bind");
 
 
 	udp_sock conn = {.sockfd = sockfd, .si_other = si_other};
@@ -260,7 +262,6 @@ int udp_recv_msg(udp_sock conn, message_t* msg){
 	struct sockaddr_in si_other;
 	socklen_t slen = sizeof(si_other);
 
-	//Will only run with a valid IP
 	int res = recvfrom(conn.sockfd, msg->data, BUFLEN, 0, (struct sockaddr *) &si_other, &slen);
 	if (res == -1) {
 		if (errno != EWOULDBLOCK || errno != EAGAIN) {
@@ -270,9 +271,8 @@ int udp_recv_msg(udp_sock conn, message_t* msg){
 	}
 	msg->dataLength = res;
 
-	//Chekc if message came from this machine
-	uint32_t ip = si_other.sin_addr.s_addr;
-	if(ip == my_ip){
+	//Check if message came from this machine
+	if(si_other.sin_addr.s_addr == my_ip.addr){
 		return -1;
 	}
 
@@ -297,23 +297,24 @@ void udp_broadcast(udp_sock conn, message_t* msg){
 
 
 
-uint32_t ip_get(){
-	int fd;
+ipv4 ip_get(){
 	struct ifreq ifr;
-	fd = socket(AF_INET, SOCK_DGRAM, 0);
+	int fd = socket(AF_INET, SOCK_DGRAM, 0);
 	ifr.ifr_addr.sa_family = AF_INET;
 	strncpy(ifr.ifr_name, "eno1", IFNAMSIZ-1);
 	ioctl(fd, SIOCGIFADDR, &ifr);
 	close(fd);
 
-	return (((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr.s_addr);
+	ipv4 ip;
+	ip.addr = (((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr.s_addr);
+	return ip;
 }
 
 
 
 
-char* ip_to_string(uint32_t ip){
-	struct in_addr in = {.s_addr = ip};
+char* ip_to_string(ipv4 ip){
+	struct in_addr in = {.s_addr = ip.addr};
 	return inet_ntoa(in);
 }
 

@@ -16,13 +16,19 @@ int main(){
 	signal(SIGINT, printCtrlC);
 
 	message_t msg;
-
+	ipv4 ip;
 	udp_sock conn = udp_open_socket(LISTEN);
 	while(1){
 
 		if(!udp_recv_msg(conn, &msg)){
-			printf("%s\n", ip_to_string(*(uint32_t*)msg.data));
-			return 0;
+			ip.addr = *(uint32_t*)msg.data;
+			printf("%s\n", ip_to_string(ip));
+			break;
 		}
+	}
+	int sockfd = tcp_openConnection(ip,TCP_PORT);
+	while(1){
+		printf("loop\n");
+		sleep(5);
 	}
 }
