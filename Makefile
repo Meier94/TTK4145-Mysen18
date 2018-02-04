@@ -8,7 +8,7 @@ CFLAGS = -std=gnu11 -g -Wall -Wextra
 LDFLAGS = -lcomedi -lm -lpthread
 
 # list of sources
-ELEVSRC1 = main.c network.c communication.c
+ELEVSRC1 = main.c network.c communication.c ./io/io.c
 TARGET1 = elevator
 ELEVSRC2 = main2.c network.c communication.c
 TARGET2 = elevator2
