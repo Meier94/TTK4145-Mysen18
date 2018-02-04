@@ -41,8 +41,9 @@ void* thr_tcp_listen(void* arg){
 
 	while (true){
 		//Waiting for message from master
-		int ret = tcp_receive(&client, &msg, 2);
+		int ret = tcp_receive(&client, &msg, 3);
 		if (ret <= 0){
+			printf("No response from master, likely gone\n");
 			continue;
 		}
 		msg.length = sprintf(msg.data, "Test message 1");
