@@ -36,6 +36,7 @@ void* thr_tcp_com_cycle(void* arg){
 void* thr_tcp_listen(void* arg){
 	msg_t msg;
 	client_t client = {.conn = (int)arg};
+	printf("listening: %d\n", client.conn);
 
 	while (true){
 		//Waiting for message from master
