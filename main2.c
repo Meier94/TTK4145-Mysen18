@@ -1,4 +1,5 @@
 #include "network.h"
+#include "communication.h"
 #include <stdio.h>
 #include <signal.h>
 
@@ -15,21 +16,26 @@ int main(){
 	network_init();
 	signal(SIGINT, printCtrlC);
 
-	message_t msg;
+	msg_t msg;
 	ipv4 ip;
-	udp_sock conn = udp_open_socket(LISTEN);
+	udp_open(LISTEN);
 	while(1){
 
-		if(udp_recv_msg(conn, &msg)){
-			ip.addr = *(uint32_t*)msg.data;
+		if(udp_receive(&msg)){
+			ip = *(uint32_t*)msg.data;
 			printf("%s\n", ip_to_string(ip));
 			break;
 		}
 	}
-	int sockfd = tcp_openConnection(ip,TCP_PORT);
-	printf("socket:%d\n",sockfd);
+	client_t client;
+	client.ip = ip;
+	if(!tcp_open_conn(&client)){
+		error("Could not open connection");
+	}
+
+	printf("socket:%d\n",client.conn);
 	pthread_t tcp_listen;
-	pthread_create(&tcp_listen, NULL, thr_tcp_listen, (void*)sockfd);
+	pthread_create(&tcp_listen, NULL, thr_tcp_listen, (void*)client.conn);
 	while(1){
 		printf("loop\n");
 		sleep(5);

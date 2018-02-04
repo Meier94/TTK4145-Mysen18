@@ -14,56 +14,47 @@
 #include <errno.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
-#include <pthread.h>
 
 #define MAX_NODES 3
-
-#define MSGID_IP 100
-#define MSGID_REQUEST 101
 
 #define BROADCAST 0
 #define LISTEN 1
 
-#define SENDER_IS_MASTER 200
-#define SENDER_IS_ALONE 201
-
+#define BUFLEN 1024
 #define UDP_PORT 4493
 #define TCP_PORT 5593
 
-typedef struct udp_sock_struct{
-	int sockfd;
-	struct sockaddr_in si_other;
-}udp_sock;
 
 typedef struct message{
-	char data[1024];
+	char data[BUFLEN];
 	int length;
-}message_t;
+}msg_t;
 
-typedef struct tcp_accept_sock_struct{
-	int sockfd;
-	fd_set fdset;
-}tcp_accept_sock;
+typedef uint32_t ipv4;
 
-typedef union ipv4{
-	uint32_t addr;
-	unsigned char comp[4];
-}ipv4;
+typedef struct client{
+	int conn;
+	ipv4 ip;
+}client_t;
 
+void					   error  (char *s);
+ipv4					  ip_get  ();
+void				network_init  ();
+char*				ip_to_string  (ipv4 ip);
 
-ipv4			ip_get();
-char* 			ip_to_string(ipv4 ip);
-void 			network_init();
+void 					udp_open  (int type);
+void 				   udp_close  (int type);
+int 				 udp_receive  (msg_t* msg);				//ret = 0: *fail*, ret = 1	: *success*
+void 			   udp_broadcast  (msg_t* msg);
 
-udp_sock 		udp_open_socket(int type);
-void 			udp_close_socket(udp_sock conn);
-void 			udp_broadcast(udp_sock conn, message_t* msg);
-int 			udp_recv_msg(udp_sock conn, message_t* msg);
-int 			tcp_openConnection(ipv4 ip, int port);
+//TCP
 
-void* 			thr_tcp_accept_connections(void* arg);
-void* 			thr_tcp_listen(void* arg);
-void* 			thr_tcp_communication_cycle(void* arg);
+void 					tcp_send  (client_t* client, msg_t* msg);
+int 				 tcp_receive  (client_t* client, msg_t* msg, uint32_t timeout);
+int 			   tcp_open_conn  (client_t* client);			//ret = 0: *fail*, ret = 1: *success* - Hva skal man gjøre om denne ikke klarer seg
 
+//TCP Server functionality
 
-
+int		  tcp_pop_access_attempt  (int access_point, client_t* client); //Burde hete tcp_accept_client?
+int		 tcp_get_access_attempts  (int access_point);					//Klarer ikke komme på bedre navn til denne, den over kan derfor ikke byttes?
+int		 tcp_create_access_point  ();

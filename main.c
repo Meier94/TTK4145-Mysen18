@@ -1,6 +1,7 @@
 #include "network.h"
-#include <stdio.h>
+#include "communication.h"
 
+#include <stdio.h>
 #include "signal.h"
 
 int count = 0;
@@ -16,26 +17,23 @@ int main(){
 	signal(SIGINT, printCtrlC);
 
 	ipv4 ip = ip_get();
-	printf("Test: %u.%u.%u.%u\n", ip.comp[0],ip.comp[1],ip.comp[2],ip.comp[3]);
 	printf("IP: %s\n", ip_to_string(ip));
-
-	udp_sock conn = udp_open_socket(BROADCAST);
-
-	message_t msg;
-	memset(msg.data, 0, 1024);
-	*(ipv4*)msg.data = ip;
-	msg.length = 4;
 
 
 	pthread_t tcp_accept;
 	pthread_t tcp_communicate;
-	pthread_create(&tcp_accept, NULL, thr_tcp_accept_connections, NULL);
-	pthread_create(&tcp_communicate, NULL, thr_tcp_communication_cycle, NULL);
+	pthread_create(&tcp_accept, NULL, thr_tcp_accept_conn, NULL);
+	pthread_create(&tcp_communicate, NULL, thr_tcp_com_cycle, NULL);
 
 
+	udp_open(BROADCAST);
+	msg_t msg;
+	memset(msg.data, 0, 1024);
+	*(ipv4*)msg.data = ip;
+	msg.length = 4;
 
 	while(1){
-		udp_broadcast(conn, &msg);
+		udp_broadcast(&msg);
 		count++;
 		usleep(1e5);
 	}
