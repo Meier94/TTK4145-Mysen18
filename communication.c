@@ -47,7 +47,7 @@ void* thr_tcp_listen(void* arg){
 			sleep(2);
 			continue;
 		}
-		msg.length = sprintf(msg.data, "Test message 1");
+		msg.length = sprintf(msg.data, "Test message 1") + 1;
 		tcp_send(&client, &msg);
 
 	}
