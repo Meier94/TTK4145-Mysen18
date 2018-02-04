@@ -21,7 +21,7 @@ void* thr_tcp_com_cycle(void* arg){
 			//Waiting for response from slave
 			int ret = tcp_receive(&client, &msg, 2);
 			if(ret > 0){
-				printf("%s\n", msg.data);
+				printf("%d: %s\n", i, msg.data);
 			}
 			else {
 				//Ingen melding mottatt til timeouten gitt ut
@@ -44,6 +44,7 @@ void* thr_tcp_listen(void* arg){
 		int ret = tcp_receive(&client, &msg, 3);
 		if (ret <= 0){
 			printf("No response from master, likely gone\n");
+			sleep(2);
 			continue;
 		}
 		msg.length = sprintf(msg.data, "Test message 1");
