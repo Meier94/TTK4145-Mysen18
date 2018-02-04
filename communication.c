@@ -28,6 +28,7 @@ void* thr_tcp_com_cycle(void* arg){
 				printf("Disconnected\n");
 				cl_remove(i);
 			}
+			sleep(1);
 		}
 	}
 	return NULL;
@@ -62,6 +63,7 @@ void* thr_tcp_accept_conn(void* arg){
 			//There are incoming connections waiting to be accepted
 			while(tcp_pop_access_attempt(access_point, &client)){
 				cl_add(client);
+				printf("client added: %s\n", ip_to_string(client.ip));
 			}
 
 		}
