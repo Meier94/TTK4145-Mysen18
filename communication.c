@@ -17,7 +17,7 @@ void* thr_tcp_com_cycle(void* arg){
 			client_t client = clientList[i];
 			msg.data[0] = MSGID_REQUEST;
 			msg.length = 1;
-			udp_broadcast(&msg);
+			tcp_send(&client,&msg);
 			//Waiting for response from slave
 			int ret = tcp_receive(&client, &msg, 2);
 			if(ret > 0){
