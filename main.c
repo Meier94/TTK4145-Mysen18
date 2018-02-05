@@ -19,17 +19,17 @@ int main(){
 	signal(SIGINT, printCtrlC);
 	printf("%d\n",io_init());
 
-	unsigned int diff;
-	unsigned int lastret = 0;
-	while(1){
-		int ret = get_relevant_signals();
-		diff = ret ^ lastret;
-		if(diff){
-			printf("%d\n", diff);
-		}
-		lastret = ret;
-		usleep(50000);
-	}
+//	unsigned int diff;
+//	unsigned int lastret = 0;
+//	while(1){
+//		int ret = get_relevant_signals();
+//		diff = ret ^ lastret;
+//		if(diff){
+//			printf("%d\n", diff);
+//		}
+//		lastret = ret;
+//		usleep(50000);
+//	}
 
 	ipv4 ip = ip_get();
 	printf("IP: %s\n", ip_to_string(ip));
