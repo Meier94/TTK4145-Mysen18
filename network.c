@@ -39,6 +39,7 @@ int tcp_receive(client_t* client, msg_t* msg, uint32_t timeout){
 		if(n < 0){
 			if (errno != EWOULDBLOCK && errno != EAGAIN) {
 				if(errno == ECONNRESET){
+					printf("Connection prob closed\n");
 					//Disconnected
 					return 0;
 				}
