@@ -1,0 +1,8 @@
+http://www.hpcs.cs.tsukuba.ac.jp/~tatebe/lecture/h23/dsys/dsd-tutorial.html
+https://en.wikipedia.org/wiki/Distributed_computing
+https://www.wikipendium.no/TDT4190_Distributed_systems
+Test om tcp har en cache evt hvor mange entries
+Guess udp burde sjekkes også
+Test error meldinger assosiert med å plugge ut nettverkskabel
+For elevatorevt loop diff deciphering: http://www.techiedelight.com/brian-kernighans-algorithm-count-set-bits-integer/
+x & (-x) : Returns the rightmost 1 in binary representation of x
