@@ -24,6 +24,20 @@ void tcp_send(client_t* client, msg_t* msg){
 	}
 }
 
+void tcp_poll(client_t* client){
+	struct pollfd pfd;
+	pfd.fd = client->conn;
+	pfd.events = POLLIN | POLLHUP | POLLRDNORM;
+	pfd.revents = 0;
+
+	if (poll(&pfd, 1, 100) > 0){
+		char buffer[32];
+		if (recv(client->conn, buffer, sizeof(buffer), MSG_PEEK | MSG_DONTWAIT) == 0) {
+			printf("Definitely disconnected");
+		}
+	}
+}
+
 
 
 //TESTET

@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
+#include <poll.h>
 
 #define MAX_NODES 3
 
@@ -52,7 +53,7 @@ void 			   udp_broadcast  (msg_t* msg);
 void 					tcp_send  (client_t* client, msg_t* msg);
 int 				 tcp_receive  (client_t* client, msg_t* msg, uint32_t timeout);
 int 			   tcp_open_conn  (client_t* client);			//ret = 0: *fail*, ret = 1: *success* - Hva skal man gjøre om denne ikke klarer seg
-
+void tcp_poll(client_t* client);
 //TCP Server functionality
 
 int		  tcp_pop_access_attempt  (int access_point, client_t* client); //Burde hete tcp_accept_client?
