@@ -19,7 +19,7 @@ void error(char *s){
 //TESTET
 // -> virker robust
 void tcp_send(client_t* client, msg_t* msg){
-	if(send(client->conn, msg->data, msg->length) < 0){
+	if(send(client->conn, msg->data, msg->length, MSG_CONFIRM) < 0){
 		error("Could not write tcp message");
 	}
 }
