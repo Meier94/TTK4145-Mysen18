@@ -18,7 +18,7 @@ void* thr_tcp_com_cycle(void* arg){
 			msg.data[0] = MSGID_REQUEST;
 			msg.length = 1;
 			sleep(1);
-			//tcp_send(&client,&msg);
+			tcp_send(&client,&msg);
 			tcp_poll(&client);
 			//Waiting for response from slave
 			int ret = tcp_receive(&client, &msg, 2);

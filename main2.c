@@ -34,7 +34,6 @@ int main(){
 	}
 
 	printf("socket:%d\n",client.conn);
-
 	pthread_t tcp_listen;
 	pthread_create(&tcp_listen, NULL, thr_tcp_listen, (void*)client.conn);
 	while(1){
